@@ -1,0 +1,20 @@
+// ENTER INFO ON USER(S)/HOSTS(S) INTO THE BELOW LIST
+// can be any combination of hostnames, usernames, email addresses, SIDs, or AzureAccountIDs
+let Search = dynamic(["user@example.com", "desktop-1234", "john.smith"]);
+// step 1: correlate all hosts and identities
+DeviceInfo
+| distinct DeviceName, LoggedOnUsers
+| project DeviceName, CurrentUsers = parse_json(LoggedOnUsers)
+| mv-apply CurrentUsers on (
+    project DeviceName, User = CurrentUsers.UserName, SID = CurrentUsers.Sid
+)
+| project DeviceName, Username = tostring(User), OnPremSid = tostring(SID)
+| join IdentityInfo on OnPremSid
+// step 2: filter for the given values
+| where DeviceName has_any (Search)
+        or AccountObjectId in (Search)
+        or Username in (Search)
+        or EmailAddress has_any (Search)
+        or OnPremSid in (Search)
+| extend FullName = strcat(GivenName, " ", Surname)
+| distinct DeviceName, FullName, JobTitle, EmailAddress, Username, OnPremSid, AccountObjectId
